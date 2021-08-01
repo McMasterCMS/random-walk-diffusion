@@ -8,6 +8,7 @@ This module has functions for displaying simulations.
 """
 
 import numpy as np
+import random
 from matplotlib import cm
 from scipy.stats.kde import gaussian_kde
 import matplotlib.pyplot as plt
@@ -17,6 +18,7 @@ from matplotlib.ticker import (MultipleLocator,
                                FormatStrFormatter,
                                AutoMinorLocator)
 from mpl_toolkits import axes_grid1
+from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 
 
 sim_bounds = 10
@@ -30,10 +32,10 @@ def display_atom(atom, atom_history=None, disp_history=None):
     """
 
     if disp_history is None:
-        fig = plt.figure(figsize=(10, 5))
+        fig = plt.figure(figsize=(14, 7))
         ax1 = fig.add_subplot('121')
     else:
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 7))
         ax2.plot(disp_history)
         x0,x1 = ax2.get_xlim()
         y0,y1 = ax2.get_ylim()
@@ -90,7 +92,7 @@ def display_atoms(atoms, atom_histories, disp_histories):
     n_atoms = len(atoms)
     m_steps = len(disp_histories[0])
     mean_disp_sq_history = [0]*m_steps
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 7))
 
     for atom, atom_history, disp_history in zip(atoms, atom_histories, disp_histories):
         # Place atom on the square lattice. Adjust zorder to enusure atom
@@ -138,15 +140,15 @@ def display_atoms(atoms, atom_histories, disp_histories):
     plt.show()
 
 
-def display_probability(atoms_final):
+def display_probability(atoms_final, compare_gaussian=True, num_jumps=None):
 
     x, y = zip(*atoms_final)
     k = gaussian_kde(np.vstack([x, y]))
     # xi, yi = np.mgrid[min(x):max(x):len(x)**0.5*1j,min(y):max(y):len(y)**0.5*1j]
     xi, yi = np.mgrid[-10:10:20j, -10:10:20j]
-    zi = k(np.vstack([xi.flatten(), yi.flatten()]))
+    zi = k(np.vstack([xi.flatten(), yi.flatten()]))*100
 
-    fig = plt.figure(figsize=(10, 5))
+    fig = plt.figure(figsize=(14, 7))
     ax1 = fig.add_subplot(121)
 
     # alpha=0.5 will make the plots semitransparent
@@ -165,17 +167,49 @@ def display_probability(atoms_final):
     ax1.xaxis.set_major_formatter(FormatStrFormatter('% d'))
 
     # fig.colorbar(cmesh, ax=ax1)
-    add_colorbar(cmesh)
+    # add_colorbar(cmesh)
+    divider = make_axes_locatable(ax1)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(cmesh,cax=cax)
+
+    if compare_gaussian:
+        ax2 = fig.add_subplot(122)
+        mu = 0
+        sigma = (num_jumps/3)**0.5 * 1
+        # sigma = 1
+
+        # Initializing value of x-axis and y-axis
+        # in the range -1 to 1
+        x, y = np.meshgrid(np.linspace(-10,10,100), np.linspace(-10,10,100))
+        dst = np.sqrt(x*x+y*y)
+
+        # Calculating Gaussian array
+        gauss = np.exp(-( (dst-mu)**2 / ( 2.0 * sigma**2 ) ) ) * 100
+
+        # alpha=0.5 will make the plots semitransparent
+        cont_mesh = ax2.contourf(x, y, gauss)
+
+        # ax1.set_xlim([-10, 10])
+        # ax1.set_ylim([-10, 10])
+
+        # Set the limits of the x- and y-axes
+        ax2.set_xlim(-10, 10)
+        ax2.set_ylim(-10, 10)
+
+        x0,x1 = ax2.get_xlim()
+        y0,y1 = ax2.get_ylim()
+        ax2.set_aspect((x1-x0)/(y1-y0))
+
+        ax2.yaxis.set_major_locator(MultipleLocator(5))
+        ax2.yaxis.set_major_formatter(FormatStrFormatter('% d'))
+        ax2.xaxis.set_major_locator(MultipleLocator(5))
+        ax2.xaxis.set_major_formatter(FormatStrFormatter('% d'))
+
+        # fig.colorbar(cmesh, ax=ax1)
+        # add_colorbar(cont_mesh)
+        divider = make_axes_locatable(ax2)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(cmesh,cax=cax)
+
 
     plt.show()
-
-
-def add_colorbar(im, aspect=20, pad_fraction=0.5, **kwargs):
-    """Add a vertical color bar to an image plot."""
-    divider = axes_grid1.make_axes_locatable(im.axes)
-    width = axes_grid1.axes_size.AxesY(im.axes, aspect=1./aspect)
-    pad = axes_grid1.axes_size.Fraction(pad_fraction, width)
-    current_ax = plt.gca()
-    cax = divider.append_axes("right", size=width, pad=pad)
-    plt.sca(current_ax)
-    return im.axes.figure.colorbar(im, cax=cax, **kwargs)
