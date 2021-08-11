@@ -156,7 +156,7 @@ def display_atoms(atom_histories):
     plt.show()
 
 
-def display_probability(atom_histories, compare_gaussian=True):
+def display_probability(atom_histories, show_gaussian=True):
 
     atoms_final = [atom_history[-1] for atom_history in atom_histories]
     x, y = zip(*atoms_final)
@@ -169,7 +169,7 @@ def display_probability(atom_histories, compare_gaussian=True):
     ax1 = fig.add_subplot(121)
 
     # alpha=0.5 will make the plots semitransparent
-    cmesh = ax1.pcolormesh(xi, yi, zi.reshape(xi.shape), alpha=0.5)
+    cmesh = ax1.pcolormesh(xi, yi, zi.reshape(xi.shape), alpha=1, cmap=plt.get_cmap('Blues'))
 
     # ax1.set_xlim([-10, 10])
     # ax1.set_ylim([-10, 10])
@@ -188,7 +188,7 @@ def display_probability(atom_histories, compare_gaussian=True):
     cax = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(cmesh,cax=cax)
 
-    if compare_gaussian:
+    if show_gaussian:
         ax2 = fig.add_subplot(122)
         mu = 0
         num_jumps = len(atom_histories[0])
@@ -204,7 +204,8 @@ def display_probability(atom_histories, compare_gaussian=True):
         gauss = np.exp(-( (dst-mu)**2 / ( 2.0 * sigma**2 ) ) ) * 100
 
         # alpha=0.5 will make the plots semitransparent
-        ax2.contourf(x, y, gauss)
+        # ax2.contourf(x, y, gauss, cmap=plt.get_cmap('Blues'))
+        ax2.pcolormesh(x, y, gauss, cmap=plt.get_cmap('Blues'))
 
         # ax1.set_xlim([-10, 10])
         # ax1.set_ylim([-10, 10])
@@ -221,8 +222,6 @@ def display_probability(atom_histories, compare_gaussian=True):
         ax2.yaxis.set_major_formatter(FormatStrFormatter('% d'))
         ax2.xaxis.set_major_locator(MultipleLocator(5))
         ax2.xaxis.set_major_formatter(FormatStrFormatter('% d'))
-
-        ax2.grid()
 
         # fig.colorbar(cmesh, ax=ax1)
         # add_colorbar(cont_mesh)
@@ -247,11 +246,13 @@ def draw_atom_history(ax, atom_history, n_atoms=1):
     x_final, y_final = atom_history[-1]
     x_hist, y_hist = zip(*atom_history)
     if n_atoms != 1:
-        alpha = 0.2
+        alpha_hist = 0.1
+        alpha_final = 0.4
     else:
-        alpha = 1
-    ax.plot(x_hist, y_hist, c='blue', alpha=alpha, zorder=2.5)
-    ax.scatter(x=x_final, y=y_final, alpha=set_alpha(n_atoms), zorder=3.5, c='blue')
+        alpha_hist = 1
+        alpha_final = 1
+    ax.plot(x_hist, y_hist, c='blue', alpha=alpha_hist, zorder=2.5)
+    ax.scatter(x=x_final, y=y_final, alpha=alpha_final, zorder=3.5, c='blue')
 
 
 def set_equal_aspect(ax):
