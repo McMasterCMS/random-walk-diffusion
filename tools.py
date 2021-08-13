@@ -19,138 +19,119 @@ from matplotlib.ticker import (MultipleLocator,
 from mpl_toolkits import axes_grid1
 from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 
+# Hard coded value for simulation limits and figure size
 graph_lim = 10
+figsize = (14, 7)
 
 
 def display_atom(atom_history, show_displacement=False):
-    """Shows the position of an atom in a square lattice. Optionally
-    show the atom position 'crumb trail' as well as display the
-    displacment of the atom versus number of jumps.
+    """Shows the position of an atom in a square lattice.
 
-    Args:
-        atom (list): x,y coordinate of atom in the lattice.
+    Optionally show the atom position 'crumb trail' as well as
+    display the displacment of the atom versus number of jumps.
+
+    Parameters
+    ----------
+    atom : list
+           x,y coordinate of atom in the lattice.
+
+    show_displacement : boolean
+        Include the plot show displacement of atom. Defaults to False.
     """
 
     # Create main figure and axis for atom plot
-    fig = plt.figure(figsize=(14, 7))
-    ax1 = fig.add_subplot('121')
+    fig = plt.figure(figsize=figsize)
+    ax_atom = fig.add_subplot('121')
 
-    # Check whether to plot atom jump history
+    # Check whether atom is a single coordinate or a list including
+    # previous positions
     if isinstance(atom_history[0], int):
-        # Place atom on the square lattice. Adjust zorder to enusure atom
-        # is on top of grid lines
+        # Place atom on the square lattice
         x_final, y_final = atom_history
-        ax1.scatter(x=x_final, y=y_final, zorder=3.5, c='blue')
+        ax_atom.scatter(x=x_final, y=y_final, zorder=3.5, c='blue')
     else:
-        # x_final, y_final = atom_history[-1]
-        # x_hist, y_hist = zip(*atom_history)
-        # ax1.plot(x_hist, y_hist, c='g', alpha=0.6, zorder=2.5)
-        # ax1.scatter(x=x_final, y=y_final, zorder=3.5, c='g')
+        # Draw atom previous position, incuding final atom position
         x_final, y_final = atom_history[-1]
-        draw_atom_history(ax1, atom_history)
+        draw_atom_history(ax_atom, atom_history)
 
     # Add in arrow to highlight atom position
-    ax1.arrow(x=0, y=0, dx=x_final, dy=y_final, width=0.2,
-              length_includes_head=True, color='purple',
-              zorder=3.0)
+    ax_atom.arrow(x=0, y=0, dx=x_final, dy=y_final, width=0.2,
+                  length_includes_head=True, color='purple',
+                  zorder=3.0)
 
-    # Set the limits of the x- and y-axes
-    ax1.set_xlim(-graph_lim, graph_lim)
-    ax1.set_ylim(-graph_lim, graph_lim)
-
-    # Ensure that the axes look square
-    # ax1.set_aspect('equal', adjustable='box')
-    set_equal_aspect(ax1)
-
-    # Add in square lattice atoms
-    draw_lattice_atoms(ax1)
-
-    # Add gridlines
-    ax1.grid()
-
-    # Format axis ticks
-    set_ticks(ax1)
-
-    # Check whether to plot atom displacement to add in additional
-    # plot
+    # Check whether to plot atom displacement
     if show_displacement:
-        ax2 = fig.add_subplot('122')
-        disp_history = displacement_history(atom_history)
-        ax2.plot(disp_history, c='purple', linewidth=4)
-        set_equal_aspect(ax2)
+        ax_disp = fig.add_subplot('122')
+
+        # Draw and format
+        draw_disp_history(ax_disp, atom_history)
+        ax_disp.set_ylabel("Displacement")
+        ax_disp.set_xlabel("Number of Simulaton Steps")
+
+        # Get displacement for atom arrow, otherwise calculate it
         disp = disp_history[-1]
     else:
         disp = displacement([x_final, y_final])
 
     # Display final displacement of atom as text.
-    ax1.text(x=0.95, y=0.92,
-             s="Displacement = {0:.2f}".format(disp),
-             horizontalalignment='right', verticalalignment='center',
-             transform=ax1.transAxes,
-             zorder=4,
-             bbox=dict(facecolor='white', alpha=1))
+    draw_box(ax_atom, "Displacement", disp)
+
+    # Add in square lattice atoms
+    draw_lattice_atoms(ax_atom)
+    set_ticks(ax_atom)
+
+    # Ensure that the axes look square
+    set_equal_aspect(ax_atom)
+    set_equal_aspect(ax_disp)
 
     # Display the atom on the square lattice
     plt.show()
 
 
 def display_atoms(atom_histories):
-    """Shows the position of an atom in a square lattice.
+    """Shows the position of various atoms in a square lattice.
 
-    Args:
-        atom (list): x,y coordinate of atom in the lattice.
+    Overlays the resulting simulation of various atoms and their
+    positions. The displacement vs. simulation time graph is included
+    displaying each atom displacement history as well at the average.
+
+    Parameters
+    ----------
+    atom_histories
+           The position history of various atoms as a list of lists.
     """
 
-    mean_disp = 0
     n_atoms = len(atom_histories)
     m_steps = len(atom_histories[0])
     mean_disp_history = [0]*m_steps
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 7))
 
+    fig, (ax_atoms, ax_disps) = plt.subplots(1, 2, figsize=figsize)
+
+    # Iterate through all atoms simulations
     for atom_history in atom_histories:
-        # Place atom on the square lattice. Adjust zorder to enusure atom
-        # is on top of grid lines
-        draw_atom_history(ax1, atom_history, n_atoms)
-        disp_history = displacement_history(atom_history)
-        ax2.plot(disp_history, c='purple', alpha=set_alpha(n_atoms))
-        # ax1.scatter(x_final, y_final, zorder=3.0, c='g', alpha=0.25)
-        # disp_final += (x_final**2 + y_final**2)**0.5 / n_atoms
-        # hist_x, hist_y = zip(*atom_history)
-        # ax1.plot(hist_x, hist_y, c='g', alpha=0.05, zorder=2.5)
+        # Draw atom trajectory and displacement
+        draw_atom_history(ax_atoms, atom_history, n_atoms)
+        draw_disp_history(ax_disps, n_atoms)
+
+        # Calculate the average displacement for the simulation
+        # Append to list for plotting
+        disp_history = calc_disp_history(atom_history)
         for i, disp in enumerate(disp_history):
             mean_disp_history[i] += disp/n_atoms
 
-    ax2.plot(mean_disp_history, zorder=3, c='purple', linewidth=4)
-    set_equal_aspect(ax2)
+    # Plot average of all trajectory displacements
+    ax_disps.plot(mean_disp_history, zorder=3, c='purple', linewidth=4)
 
-    # Set the limits of the x- and y-axes
-    ax1.set_xlim(-graph_lim, graph_lim)
-    ax1.set_ylim(-graph_lim, graph_lim)
+    # Include average final displacement of atoms
+    draw_box(ax_atoms, "Mean Displacement", mean_disp_history[-1])
 
-    draw_lattice_atoms(ax1)
+    # Draw square lattice atoms
+    draw_lattice_atoms(ax_atoms)
+    set_ticks(ax_atoms)
 
-    # Add gridlines
-    ax1.grid()
-
-    # Ensure that the axes look square
-    # ax1.set_aspect('equal', adjustable='box')
-    set_equal_aspect(ax1)
-
-    ax1.text(0.95, 0.92, "Mean Displacement = {0:.2f}".format(mean_disp_history[-1]), horizontalalignment='right', verticalalignment='center', transform=ax1.transAxes, bbox=dict(facecolor='white', alpha=1))
-
-    # Make x-axis with major ticks that
-    # are multiples of 11 and Label major
-    # ticks with '% 1.2f' formatting
-    ax1.yaxis.set_major_locator(MultipleLocator(5))
-    ax1.yaxis.set_major_formatter(FormatStrFormatter('% d'))
-    ax1.xaxis.set_major_locator(MultipleLocator(5))
-    ax1.xaxis.set_major_formatter(FormatStrFormatter('% d'))
-
-    # make x-axis with minor ticks that
-    # are multiples of 1 and label minor
-    # ticks with '% 1.2f' formatting
-    # ax1.minorticks_off()
-    set_ticks(ax1)
+    # Make plots square
+    set_equal_aspect(ax_atoms)
+    set_equal_aspect(ax_disps)
 
     # Display the atom on the square lattice
     plt.show()
@@ -166,13 +147,11 @@ def display_probability(atom_histories, show_gaussian=True):
     zi = k(np.vstack([xi.flatten(), yi.flatten()]))*100
 
     fig = plt.figure(figsize=(14, 7))
-    ax1 = fig.add_subplot(121)
+    ax_atoms = fig.add_subplot(121)
 
     # alpha=0.5 will make the plots semitransparent
     cmesh = ax1.pcolormesh(xi, yi, zi.reshape(xi.shape), alpha=1, cmap=plt.get_cmap('Blues'))
 
-    # ax1.set_xlim([-10, 10])
-    # ax1.set_ylim([-10, 10])
 
     set_equal_aspect(ax1)
 
@@ -255,13 +234,38 @@ def draw_atom_history(ax, atom_history, n_atoms=1):
     ax.scatter(x=x_final, y=y_final, alpha=alpha_final, zorder=3.5, c='blue')
 
 
+def draw_disp_history(ax, atom_history, n_atoms=1):
+
+    # Calculate displacements based of previous positions
+    disp_history = calc_disp_history(atom_history)
+
+    if n_atoms != 1:
+        alpha = set_alpha(n_atoms)
+    else:
+        alpha = 1
+
+    # Plot and format
+    ax.plot(disp_history, alpha=alpha, c='purple', linewidth=4)
+
+
 def set_equal_aspect(ax):
     x_lower, x_upper = ax.get_xlim()
     y_lower, y_upper = ax.get_ylim()
     ax.set_aspect((x_upper-x_lower)/(y_upper-y_lower))
 
 
+def draw_box(ax, text, float_value):
+    value_str = "{0:.2f}".format(float_value)
+    ax.text(x=0.95, y=0.92,
+            s="text" + "=" + value_str,
+            horizontalalignment='right', verticalalignment='center',
+            transform=ax_atoms.transAxes,
+            bbox=dict(facecolor='white', alpha=1))
+
+
 def set_ticks(ax):
+
+    ax.grid()
 
     # Make x and y axis major ticks multiples of 5
     ax.yaxis.set_major_locator(MultipleLocator(5))
@@ -275,7 +279,7 @@ def set_ticks(ax):
     ax.minorticks_off()
 
 
-def displacement_history(atom_history):
+def calc_disp_history(atom_history):
     disp_history = []
     for xy in atom_history:
         disp_history.append(displacement(xy))
