@@ -33,7 +33,7 @@ def display_atom(atom_history, show_displacement=False):
     Parameters
     ----------
     atom : list
-           x,y coordinate of atom in the lattice.
+        x,y coordinate of atom in the lattice.
 
     show_displacement : boolean
         Include the plot show displacement of atom. Defaults to False.
@@ -97,8 +97,8 @@ def display_atoms(atom_histories):
 
     Parameters
     ----------
-    atom_histories
-           The position history of various atoms as a list of lists.
+    atom_histories : list
+        The position history of various atoms as stored list of lists.
     """
 
     n_atoms = len(atom_histories)
@@ -137,33 +137,47 @@ def display_atoms(atom_histories):
     plt.show()
 
 
-def display_probability(atom_histories, show_gaussian=True):
+def display_probability(atom_histories, show_gaussian=False):
+    """Shows the final position of simulated atoms normalized by the
+    number of atoms.
 
-    atoms_final = [atom_history[-1] for atom_history in atom_histories]
-    x, y = zip(*atoms_final)
-    k = gaussian_kde(np.vstack([x, y]))
-    # xi, yi = np.mgrid[min(x):max(x):len(x)**0.5*1j,min(y):max(y):len(y)**0.5*1j]
-    xi, yi = np.mgrid[-10:10:20j, -10:10:20j]
-    zi = k(np.vstack([xi.flatten(), yi.flatten()]))*100
+    Equivalent to probability. Option to show the theoretical,
+    continuous gaussian distribution of final atom positions.
+
+    Parameters
+    ----------
+    atom_histories : list
+        The position history of various atoms as stored list of lists.
+
+    show_gaussian : bool
+        Display the theoretical atom distribution. Defaults to False.
+    """
+
 
     fig = plt.figure(figsize=(14, 7))
     ax_atoms = fig.add_subplot(121)
 
-    # alpha=0.5 will make the plots semitransparent
-    cmesh = ax1.pcolormesh(xi, yi, zi.reshape(xi.shape), alpha=1, cmap=plt.get_cmap('Blues'))
+    # Get final position of atoms and unpack as x,y values
+    atoms_final = [atom_history[-1] for atom_history in atom_histories]
+    x, y = zip(*atoms_final)
+
+    # Create the estimated gaussian distribution
+    x_grid, y_grid = np.mgrid[-graph_lim:graph_lim:2*graph_lim*1j,
+                              -graph_lim:graph_lim:2*graph_lim*1j]
+    positions = np.vstack([x_grid.ravel(), y_grid.ravel()])
+    values = np.vstack([x, y])
+    kernel_est = gaussian_kde(values)
+    z_grid = np.reshape(kernel_est(positions).T, x_grid.shape)) * 100
+
+    # Generate 2D mesh to represent gaussian
+    cmesh = ax_atoms.pcolormesh(x_grid, y_grid, z_grid, alpha=1,
+                                cmap=plt.get_cmap('Blues'))
 
 
-    set_equal_aspect(ax1)
+    set_equal_aspect(ax_atoms)
+    set_ticks(ax_atoms)
 
-    # ax1.yaxis.set_major_locator(MultipleLocator(5))
-    # ax1.yaxis.set_major_formatter(FormatStrFormatter('% d'))
-    # ax1.xaxis.set_major_locator(MultipleLocator(5))
-    # ax1.xaxis.set_major_formatter(FormatStrFormatter('% d'))
-    set_ticks(ax1)
-
-    # fig.colorbar(cmesh, ax=ax1)
-    # add_colorbar(cmesh)
-    divider = make_axes_locatable(ax1)
+    divider = make_axes_locatable(ax_atoms)
     cax = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(cmesh,cax=cax)
 
@@ -185,9 +199,6 @@ def display_probability(atom_histories, show_gaussian=True):
         # alpha=0.5 will make the plots semitransparent
         # ax2.contourf(x, y, gauss, cmap=plt.get_cmap('Blues'))
         ax2.pcolormesh(x, y, gauss, cmap=plt.get_cmap('Blues'))
-
-        # ax1.set_xlim([-10, 10])
-        # ax1.set_ylim([-10, 10])
 
         # Set the limits of the x- and y-axes
         ax2.set_xlim(-10, 10)
