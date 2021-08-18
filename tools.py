@@ -48,7 +48,7 @@ def display_atom(atom_history, show_displacement=False):
     if isinstance(atom_history[0], int):
         # Place atom on the square lattice
         x_final, y_final = atom_history
-        ax_atom.scatter(x=x_final, y=y_final, zorder=3.5, c='blue')
+        ax_atom.scatter(x=x_final, y=y_final, c='blue')
     else:
         # Draw atom previous position, incuding final atom position
         x_final, y_final = atom_history[-1]
@@ -56,8 +56,15 @@ def display_atom(atom_history, show_displacement=False):
 
     # Add in arrow to highlight atom position
     ax_atom.arrow(x=0, y=0, dx=x_final, dy=y_final, width=0.2,
-                  length_includes_head=True, color='purple',
-                  zorder=3.0)
+                  length_includes_head=True, color='purple')
+
+    # Display final displacement of atom as text.
+    disp = displacement([x_final, y_final])
+    draw_box(ax_atom, "Displacement", disp)
+
+    set_ticks(ax_atom)
+    set_equal_aspect(ax_atom)
+    draw_lattice_atoms(ax_atom)
 
     # Check whether to plot atom displacement
     if show_displacement:
@@ -68,21 +75,8 @@ def display_atom(atom_history, show_displacement=False):
         ax_disp.set_ylabel("Displacement")
         ax_disp.set_xlabel("Number of Simulaton Steps")
 
-        # Get displacement for atom arrow, otherwise calculate it
-        disp = disp_history[-1]
-    else:
-        disp = displacement([x_final, y_final])
-
-    # Display final displacement of atom as text.
-    draw_box(ax_atom, "Displacement", disp)
-
-    # Add in square lattice atoms
-    draw_lattice_atoms(ax_atom)
-    set_ticks(ax_atom)
-
-    # Ensure that the axes look square
-    set_equal_aspect(ax_atom)
-    set_equal_aspect(ax_disp)
+        # Ensure that the axes look square
+        set_equal_aspect(ax_disp)
 
     # Display the atom on the square lattice
     plt.show()
@@ -120,7 +114,7 @@ def display_atoms(atom_histories):
             mean_disp_history[i] += disp/n_atoms
 
     # Plot average of all trajectory displacements
-    ax_disps.plot(mean_disp_history, zorder=3, c='purple', linewidth=4)
+    ax_disps.plot(mean_disp_history, c='purple', linewidth=4)
 
     # Include average final displacement of atoms
     draw_box(ax_atoms, "Mean Displacement", mean_disp_history[-1])
@@ -153,72 +147,46 @@ def display_probability(atom_histories, show_gaussian=False):
         Display the theoretical atom distribution. Defaults to False.
     """
 
-
     fig = plt.figure(figsize=(14, 7))
     ax_atoms = fig.add_subplot(121)
 
     # Get final position of atoms and unpack as x,y values
     atoms_final = [atom_history[-1] for atom_history in atom_histories]
-    x, y = zip(*atoms_final)
+    x_hist, y_hist = zip(*atoms_final)
 
     # Create the estimated gaussian distribution
     x_grid, y_grid = np.mgrid[-graph_lim:graph_lim:2*graph_lim*1j,
                               -graph_lim:graph_lim:2*graph_lim*1j]
-    positions = np.vstack([x_grid.ravel(), y_grid.ravel()])
-    values = np.vstack([x, y])
-    kernel_est = gaussian_kde(values)
-    z_grid = np.reshape(kernel_est(positions).T, x_grid.shape)) * 100
+    z_grid = estimate_gaussian_values(x_hist, y_hist, x_grid, y_grid)
 
     # Generate 2D mesh to represent gaussian
-    cmesh = ax_atoms.pcolormesh(x_grid, y_grid, z_grid, alpha=1,
-                                cmap=plt.get_cmap('Blues'))
+    atom_count_mesh = ax_atoms.pcolormesh(x_grid, y_grid, z_grid,
+                                          cmap=plt.get_cmap('Blues'))
 
-
+    # Make plots square, adjust ticks, add in colorbars
     set_equal_aspect(ax_atoms)
     set_ticks(ax_atoms)
-
-    divider = make_axes_locatable(ax_atoms)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    plt.colorbar(cmesh,cax=cax)
+    set_colorbar(ax_atoms, atom_count_mesh)
 
     if show_gaussian:
-        ax2 = fig.add_subplot(122)
-        mu = 0
+        # Add in axis for gaussian distribution
+        ax_gauss = fig.add_subplot(122)
         num_jumps = len(atom_histories[0])
-        sigma = (num_jumps/3)**0.5 * 1
-        # sigma = 1
 
-        # Initializing value of x-axis and y-axis
-        # in the range -1 to 1
-        x, y = np.meshgrid(np.linspace(-10,10,100), np.linspace(-10,10,100))
-        dst = np.sqrt(x*x+y*y)
+        # Set distribution mean and standard deviation
+        mean = 0
+        std_dev = (num_jumps/3)**0.5 * 1
 
-        # Calculating Gaussian array
-        gauss = np.exp(-( (dst-mu)**2 / ( 2.0 * sigma**2 ) ) ) * 100
+        # Approximate continuous distribution with many grid points
+        x_cont, y_cont = np.mgrid[-graph_lim:graph_lim:1000*graph_lim*1j,
+                                  -graph_lim:graph_lim:1000*graph_lim*1j]
+        z_cont = exact_gaussian_values(x_cont, y_cont)
+        gauss_mesh = ax_gauss.pcolormesh(x_cont, y_cont, z_cont,
+                                         cmap=plt.get_cmap('Blues'))
 
-        # alpha=0.5 will make the plots semitransparent
-        # ax2.contourf(x, y, gauss, cmap=plt.get_cmap('Blues'))
-        ax2.pcolormesh(x, y, gauss, cmap=plt.get_cmap('Blues'))
-
-        # Set the limits of the x- and y-axes
-        ax2.set_xlim(-10, 10)
-        ax2.set_ylim(-10, 10)
-
-        x0,x1 = ax2.get_xlim()
-        y0,y1 = ax2.get_ylim()
-        ax2.set_aspect((x1-x0)/(y1-y0))
-
-        ax2.yaxis.set_major_locator(MultipleLocator(5))
-        ax2.yaxis.set_major_formatter(FormatStrFormatter('% d'))
-        ax2.xaxis.set_major_locator(MultipleLocator(5))
-        ax2.xaxis.set_major_formatter(FormatStrFormatter('% d'))
-
-        # fig.colorbar(cmesh, ax=ax1)
-        # add_colorbar(cont_mesh)
-        divider = make_axes_locatable(ax2)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        plt.colorbar(cmesh,cax=cax)
-
+        set_equal_aspect(ax_gauss)
+        set_ticks(ax_gauss)
+        set_colorbar(ax_gauss, gauss_mesh)
 
     plt.show()
 
@@ -241,8 +209,8 @@ def draw_atom_history(ax, atom_history, n_atoms=1):
     else:
         alpha_hist = 1
         alpha_final = 1
-    ax.plot(x_hist, y_hist, c='blue', alpha=alpha_hist, zorder=2.5)
-    ax.scatter(x=x_final, y=y_final, alpha=alpha_final, zorder=3.5, c='blue')
+    ax.plot(x_hist, y_hist, c='blue', alpha=alpha_hist)
+    ax.scatter(x=x_final, y=y_final, alpha=alpha_final, c='blue')
 
 
 def draw_disp_history(ax, atom_history, n_atoms=1):
@@ -268,13 +236,16 @@ def set_equal_aspect(ax):
 def draw_box(ax, text, float_value):
     value_str = "{0:.2f}".format(float_value)
     ax.text(x=0.95, y=0.92,
-            s="text" + "=" + value_str,
+            s=text + "=" + value_str,
             horizontalalignment='right', verticalalignment='center',
-            transform=ax_atoms.transAxes,
+            transform=ax.transAxes,
             bbox=dict(facecolor='white', alpha=1))
 
 
 def set_ticks(ax):
+
+    ax.set_xlim([-graph_lim, graph_lim])
+    ax.set_ylim([-graph_lim, graph_lim])
 
     ax.grid()
 
@@ -309,3 +280,26 @@ def set_alpha(x):
     n = 5
     return n / (n+x)
 
+
+def set_colorbar(ax, color_mesh):
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(color_mesh, cax=cax)
+
+
+def estimate_gaussian_values(x, y, x_grid, y_grid):
+    positions = np.vstack([x_grid.ravel(), y_grid.ravel()])
+    values = np.vstack([x, y])
+    kernel_est = gaussian_kde(values)
+    z_grid = np.reshape(kernel_est(positions).T, x_grid.shape)
+
+    return z_grid * 100
+
+
+def exact_gaussian_values(mean, std_dev, x_cont, y_cont):
+    distance = np.sqrt(x_cont*x_cont+y_cont*y_cont)
+
+    # Calculate gaussian mesh
+    z_gauss = np.exp(-((distance-mean)**2 / ( 2.0 * std_dev**2 )))
+
+    return z_gauss * 100
