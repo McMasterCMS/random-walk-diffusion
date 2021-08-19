@@ -7,6 +7,7 @@ diffusion.
 This module has functions for displaying simulations.
 """
 
+from math import pi
 import numpy as np
 from matplotlib import cm
 from scipy.stats.kde import gaussian_kde
@@ -15,7 +16,8 @@ from matplotlib.figure import Figure
 from matplotlib.ticker import (MultipleLocator,
                                IndexLocator,
                                FormatStrFormatter,
-                               AutoMinorLocator)
+                               AutoMinorLocator,
+                               FuncFormatter)
 from mpl_toolkits import axes_grid1
 from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 
@@ -105,7 +107,7 @@ def display_atoms(atom_histories):
     for atom_history in atom_histories:
         # Draw atom trajectory and displacement
         draw_atom_history(ax_atoms, atom_history, n_atoms)
-        draw_disp_history(ax_disps, n_atoms)
+        draw_disp_history(ax_disps, atom_history, n_atoms)
 
         # Calculate the average displacement for the simulation
         # Append to list for plotting
@@ -114,7 +116,9 @@ def display_atoms(atom_histories):
             mean_disp_history[i] += disp/n_atoms
 
     # Plot average of all trajectory displacements
-    ax_disps.plot(mean_disp_history, c='purple', linewidth=4)
+    ax_disps.plot(mean_disp_history, c='purple', linewidth=5)
+    ax_disps.set_ylabel("Displacement")
+    ax_disps.set_xlabel("Number of Simulaton Steps")
 
     # Include average final displacement of atoms
     draw_box(ax_atoms, "Mean Displacement", mean_disp_history[-1])
@@ -149,40 +153,52 @@ def display_probability(atom_histories, show_gaussian=False):
 
     fig = plt.figure(figsize=(14, 7))
     ax_atoms = fig.add_subplot(121)
+    num_jumps = len(atom_histories[0])
 
     # Get final position of atoms and unpack as x,y values
     atoms_final = [atom_history[-1] for atom_history in atom_histories]
     x_hist, y_hist = zip(*atoms_final)
 
     # Create the estimated gaussian distribution
-    x_grid, y_grid = np.mgrid[-graph_lim:graph_lim:2*graph_lim*1j,
-                              -graph_lim:graph_lim:2*graph_lim*1j]
-    z_grid = estimate_gaussian_values(x_hist, y_hist, x_grid, y_grid)
+    x_grid, y_grid = np.mgrid[-graph_lim+1:graph_lim-1:(2*graph_lim-1)*1j,
+                              -graph_lim+1:graph_lim-1:(2*graph_lim-1)*1j]
+    # z_grid = estimate_gaussian_values(x_hist, y_hist)
 
     # Generate 2D mesh to represent gaussian
-    atom_count_mesh = ax_atoms.pcolormesh(x_grid, y_grid, z_grid,
-                                          cmap=plt.get_cmap('Blues'))
+    # atom_count_mesh = ax_atoms.pcolormesh(x_grid, y_grid, z_grid,
+    #                                       cmap=plt.get_cmap('Blues'),
+    #                                       vmin=0,
+    #                                       vmax=set_color_lim(num_jumps))
+    draw_atoms_histogram(ax_atoms, x_hist, y_hist)
+
+    ax_atoms.set_xlabel("Percentage of Atoms at a Given Position After " \
+                        "m Simulation Steps", labelpad=20)
 
     # Make plots square, adjust ticks, add in colorbars
+    draw_lattice_atoms(ax_atoms)
     set_equal_aspect(ax_atoms)
     set_ticks(ax_atoms)
-    set_colorbar(ax_atoms, atom_count_mesh)
+    # set_colorbar(ax_atoms, atom_count_mesh)
 
     if show_gaussian:
         # Add in axis for gaussian distribution
         ax_gauss = fig.add_subplot(122)
-        num_jumps = len(atom_histories[0])
 
         # Set distribution mean and standard deviation
         mean = 0
         std_dev = (num_jumps/3)**0.5 * 1
 
         # Approximate continuous distribution with many grid points
-        x_cont, y_cont = np.mgrid[-graph_lim:graph_lim:1000*graph_lim*1j,
-                                  -graph_lim:graph_lim:1000*graph_lim*1j]
-        z_cont = exact_gaussian_values(x_cont, y_cont)
+        x_cont, y_cont = np.mgrid[-graph_lim:graph_lim:10*graph_lim*1j,
+                                  -graph_lim:graph_lim:10*graph_lim*1j]
+        z_cont = exact_gaussian_values(mean, std_dev, num_jumps, x_cont, y_cont)
         gauss_mesh = ax_gauss.pcolormesh(x_cont, y_cont, z_cont,
-                                         cmap=plt.get_cmap('Blues'))
+                                         cmap=plt.get_cmap('Blues'),
+                                         vmin=0,
+                                         vmax=set_color_lim(num_jumps))
+
+        ax_gauss.set_xlabel("Exact Atom Position Probability After m " \
+                            "Simulation Steps", labelpad=20)
 
         set_equal_aspect(ax_gauss)
         set_ticks(ax_gauss)
@@ -192,11 +208,9 @@ def display_probability(atom_histories, show_gaussian=False):
 
 
 def draw_lattice_atoms(ax):
-    x_lower, x_upper = [int(lim) for lim in ax.get_xlim()]
-    y_lower, y_upper = [int(lim) for lim in ax.get_ylim()]
-    for x in range(x_lower+1, x_upper+1):
-        for y in range(y_lower+1, y_upper+1):
-            lattice_circle = plt.Circle((x-0.5, y-0.5), 0.45, fill=False, edgecolor='gray')
+    for x in np.linspace(-graph_lim+0.5, graph_lim-0.5, 2*graph_lim):
+        for y in np.linspace(-graph_lim+0.5, graph_lim-0.5, 2*graph_lim):
+            lattice_circle = plt.Circle((x, y), 0.5, fill=False, edgecolor='gray')
             ax.add_artist(lattice_circle)
 
 
@@ -224,7 +238,7 @@ def draw_disp_history(ax, atom_history, n_atoms=1):
         alpha = 1
 
     # Plot and format
-    ax.plot(disp_history, alpha=alpha, c='purple', linewidth=4)
+    ax.plot(disp_history, alpha=alpha, c='purple', linewidth=2)
 
 
 def set_equal_aspect(ax):
@@ -284,22 +298,29 @@ def set_alpha(x):
 def set_colorbar(ax, color_mesh):
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
-    plt.colorbar(color_mesh, cax=cax)
+
+    tick_func = lambda x,pos: "{:.0%}".format(x)
+    tick_format = FuncFormatter(tick_func)
+    plt.colorbar(color_mesh, cax=cax, format=tick_format)
+
+def set_color_lim(m_steps):
+    return 3 / (2 * pi * m_steps) * 100
+
+def draw_atoms_histogram(ax_atoms, x_hist, y_hist):
+    _, _, _, color_mesh = ax_atoms.hist2d(x_hist, y_hist, bins=2*graph_lim+1, range=[[-graph_lim-0.5, graph_lim+0.5], [-graph_lim-0.5, graph_lim+0.5]], density=True, cmap=plt.get_cmap('Blues'))
+
+    divider = make_axes_locatable(ax_atoms)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    tick_func = lambda x,pos: "{:.0%}".format(x)
+    tick_format = FuncFormatter(tick_func)
+    plt.colorbar(color_mesh, cax=cax, format=tick_format)
 
 
-def estimate_gaussian_values(x, y, x_grid, y_grid):
-    positions = np.vstack([x_grid.ravel(), y_grid.ravel()])
-    values = np.vstack([x, y])
-    kernel_est = gaussian_kde(values)
-    z_grid = np.reshape(kernel_est(positions).T, x_grid.shape)
-
-    return z_grid * 100
-
-
-def exact_gaussian_values(mean, std_dev, x_cont, y_cont):
+def exact_gaussian_values(mean, std_dev, m_steps, x_cont, y_cont):
     distance = np.sqrt(x_cont*x_cont+y_cont*y_cont)
 
     # Calculate gaussian mesh
-    z_gauss = np.exp(-((distance-mean)**2 / ( 2.0 * std_dev**2 )))
+    z_cont = np.exp(-((distance-mean)**2 / ( 2.0 * std_dev**2 )))
+    z_cont *= 3 / (2 * pi * m_steps)
 
-    return z_gauss * 100
+    return z_cont
