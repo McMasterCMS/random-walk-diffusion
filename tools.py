@@ -154,21 +154,13 @@ def display_probability(atom_histories, show_gaussian=False):
     fig = plt.figure(figsize=(14, 7))
     ax_atoms = fig.add_subplot(121)
     num_jumps = len(atom_histories[0])
+    m_steps = len(atom_histories[0])
 
     # Get final position of atoms and unpack as x,y values
     atoms_final = [atom_history[-1] for atom_history in atom_histories]
     x_hist, y_hist = zip(*atoms_final)
 
     # Create the estimated gaussian distribution
-    x_grid, y_grid = np.mgrid[-graph_lim+1:graph_lim-1:(2*graph_lim-1)*1j,
-                              -graph_lim+1:graph_lim-1:(2*graph_lim-1)*1j]
-    # z_grid = estimate_gaussian_values(x_hist, y_hist)
-
-    # Generate 2D mesh to represent gaussian
-    # atom_count_mesh = ax_atoms.pcolormesh(x_grid, y_grid, z_grid,
-    #                                       cmap=plt.get_cmap('Blues'),
-    #                                       vmin=0,
-    #                                       vmax=set_color_lim(num_jumps))
     draw_atoms_histogram(ax_atoms, x_hist, y_hist)
 
     ax_atoms.set_xlabel("Percentage of Atoms at a Given Position After " \
@@ -188,21 +180,14 @@ def display_probability(atom_histories, show_gaussian=False):
         mean = 0
         std_dev = (num_jumps/3)**0.5 * 1
 
-        # Approximate continuous distribution with many grid points
-        x_cont, y_cont = np.mgrid[-graph_lim:graph_lim:10*graph_lim*1j,
-                                  -graph_lim:graph_lim:10*graph_lim*1j]
-        z_cont = exact_gaussian_values(mean, std_dev, num_jumps, x_cont, y_cont)
-        gauss_mesh = ax_gauss.pcolormesh(x_cont, y_cont, z_cont,
-                                         cmap=plt.get_cmap('Blues'),
-                                         vmin=0,
-                                         vmax=set_color_lim(num_jumps))
+        draw_theoretical_histogram(ax_gauss, mean, std_dev, num_jumps, m_steps)
 
         ax_gauss.set_xlabel("Exact Atom Position Probability After m " \
                             "Simulation Steps", labelpad=20)
 
+        draw_lattice_atoms(ax_gauss)
         set_equal_aspect(ax_gauss)
-        set_ticks(ax_gauss)
-        set_colorbar(ax_gauss, gauss_mesh)
+        # set_ticks(ax_gauss)
 
     plt.show()
 
@@ -298,13 +283,12 @@ def set_alpha(x):
 def set_colorbar(ax, color_mesh):
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
-
     tick_func = lambda x,pos: "{:.0%}".format(x)
     tick_format = FuncFormatter(tick_func)
     plt.colorbar(color_mesh, cax=cax, format=tick_format)
 
 def set_color_lim(m_steps):
-    return 3 / (2 * pi * m_steps) * 100
+    return 3 / (2 * pi * m_steps)
 
 def draw_atoms_histogram(ax_atoms, x_hist, y_hist):
     _, _, _, color_mesh = ax_atoms.hist2d(x_hist, y_hist, bins=2*graph_lim+1, range=[[-graph_lim-0.5, graph_lim+0.5], [-graph_lim-0.5, graph_lim+0.5]], density=True, cmap=plt.get_cmap('Blues'))
@@ -316,11 +300,25 @@ def draw_atoms_histogram(ax_atoms, x_hist, y_hist):
     plt.colorbar(color_mesh, cax=cax, format=tick_format)
 
 
-def exact_gaussian_values(mean, std_dev, m_steps, x_cont, y_cont):
-    distance = np.sqrt(x_cont*x_cont+y_cont*y_cont)
+def draw_theoretical_histogram(ax_gauss, mean, std_dev, num_jumps, m_steps):
+
+    # Approximate continuous distribution with many grid points
+    x_cont, y_cont = np.mgrid[-graph_lim:graph_lim:(2*graph_lim)*1j,
+                                -graph_lim:graph_lim:(2*graph_lim)*1j]
 
     # Calculate gaussian mesh
+    distance = np.sqrt(x_cont*x_cont+y_cont*y_cont)
     z_cont = np.exp(-((distance-mean)**2 / ( 2.0 * std_dev**2 )))
     z_cont *= 3 / (2 * pi * m_steps)
 
-    return z_cont
+    gauss_mesh = ax_gauss.pcolormesh(x_cont, y_cont, z_cont,
+                                        cmap=plt.get_cmap('Blues'))
+
+    # vmin=0,
+    # vmax=set_color_lim(num_jumps)
+
+    divider = make_axes_locatable(ax_gauss)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    tick_func = lambda x,pos: "{:.0%}".format(x)
+    tick_format = FuncFormatter(tick_func)
+    plt.colorbar(gauss_mesh, cax=cax, format=tick_format)
