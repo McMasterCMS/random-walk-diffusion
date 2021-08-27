@@ -9,16 +9,10 @@ This module has functions for displaying simulations.
 
 from math import pi
 import numpy as np
-from matplotlib import cm
-from scipy.stats.kde import gaussian_kde
 import matplotlib.pyplot as plt
-from matplotlib.figure import Figure
 from matplotlib.ticker import (MultipleLocator,
-                               IndexLocator,
                                FormatStrFormatter,
-                               AutoMinorLocator,
                                FuncFormatter)
-from mpl_toolkits import axes_grid1
 from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 
 # Hard coded value for simulation limits and figure size
@@ -50,7 +44,7 @@ def display_atom(atom_history, show_displacement=False):
     if isinstance(atom_history[0], int):
         # Place atom on the square lattice
         x_final, y_final = atom_history
-        ax_atom.scatter(x=x_final, y=y_final, c='blue')
+        ax_atom.scatter(x=x_final, y=y_final, c='blue', zorder=4)
     else:
         # Draw atom previous position, incuding final atom position
         x_final, y_final = atom_history[-1]
@@ -58,7 +52,7 @@ def display_atom(atom_history, show_displacement=False):
 
     # Add in arrow to highlight atom position
     ax_atom.arrow(x=0, y=0, dx=x_final, dy=y_final, width=0.2,
-                  length_includes_head=True, color='purple')
+                  length_includes_head=True, color='purple', zorder=5)
 
     # Display final displacement of atom as text.
     disp = displacement([x_final, y_final])
@@ -153,15 +147,17 @@ def display_probability(atom_histories, show_gaussian=False):
 
     fig = plt.figure(figsize=(14, 7))
     ax_atoms = fig.add_subplot(121)
+
+    # Since the there's 1 jump per timestep, steps equals jumps
     num_jumps = len(atom_histories[0])
     m_steps = len(atom_histories[0])
 
     # Get final position of atoms and unpack as x,y values
     atoms_final = [atom_history[-1] for atom_history in atom_histories]
-    x_hist, y_hist = zip(*atoms_final)
+    x_finals, y_finals = zip(*atoms_final)
 
     # Create the estimated gaussian distribution
-    draw_atoms_histogram(ax_atoms, x_hist, y_hist)
+    draw_atoms_histogram(ax_atoms, x_finals, y_finals)
 
     ax_atoms.set_xlabel("Percentage of Atoms at a Given Position After " \
                         "m Simulation Steps", labelpad=20)
@@ -170,7 +166,6 @@ def display_probability(atom_histories, show_gaussian=False):
     draw_lattice_atoms(ax_atoms)
     set_equal_aspect(ax_atoms)
     set_ticks(ax_atoms)
-    # set_colorbar(ax_atoms, atom_count_mesh)
 
     if show_gaussian:
         # Add in axis for gaussian distribution
@@ -180,39 +175,56 @@ def display_probability(atom_histories, show_gaussian=False):
         mean = 0
         std_dev = (num_jumps/3)**0.5 * 1
 
-        draw_theoretical_histogram(ax_gauss, mean, std_dev, num_jumps, m_steps)
+        # Draw the historgram for true gaussian distribution
+        draw_theoretical_histogram(ax_gauss, mean, std_dev, m_steps)
 
         ax_gauss.set_xlabel("Exact Atom Position Probability After m " \
                             "Simulation Steps", labelpad=20)
 
         draw_lattice_atoms(ax_gauss)
         set_equal_aspect(ax_gauss)
-        # set_ticks(ax_gauss)
+        set_ticks(ax_gauss)
 
     plt.show()
 
 
 def draw_lattice_atoms(ax):
+    """Draw circle representing a lattice atom at every grid point,
+    shifting by half a unit such that the diffusing atom resides at
+    the grid point instead."""
+
+    # Iterate through between the graph limits, shifted by half a unit
     for x in np.linspace(-graph_lim+0.5, graph_lim-0.5, 2*graph_lim):
         for y in np.linspace(-graph_lim+0.5, graph_lim-0.5, 2*graph_lim):
+            # Make circle and add it to the graph axis
             lattice_circle = plt.Circle((x, y), 0.5, fill=False, edgecolor='gray')
             ax.add_artist(lattice_circle)
 
 
 def draw_atom_history(ax, atom_history, n_atoms=1):
+    """Draw the atom's previous path from starting point to endpoint.
+    If there are several atoms to be drawn, transparency is added."""
+
+    # Get final atom endpoint and previous path as xy coordinates
     x_final, y_final = atom_history[-1]
     x_hist, y_hist = zip(*atom_history)
+
+    # If several atoms to draw, add transparency
     if n_atoms != 1:
         alpha_hist = 0.1
         alpha_final = 0.4
     else:
         alpha_hist = 1
         alpha_final = 1
+
+    # Plot final position as point, and previous path as a line
     ax.plot(x_hist, y_hist, c='blue', alpha=alpha_hist)
     ax.scatter(x=x_final, y=y_final, alpha=alpha_final, c='blue')
 
 
 def draw_disp_history(ax, atom_history, n_atoms=1):
+    """Draw the displacement of an atom path against the number of time
+    steps/jumps."""
 
     # Calculate displacements based of previous positions
     disp_history = calc_disp_history(atom_history)
@@ -227,13 +239,20 @@ def draw_disp_history(ax, atom_history, n_atoms=1):
 
 
 def set_equal_aspect(ax):
+    """Adjust the graph axis so they're square."""
     x_lower, x_upper = ax.get_xlim()
     y_lower, y_upper = ax.get_ylim()
     ax.set_aspect((x_upper-x_lower)/(y_upper-y_lower))
 
 
 def draw_box(ax, text, float_value):
+    """Draw a text box in the upper righthand corner of the graph."""
+
+    # Convert float to string
     value_str = "{0:.2f}".format(float_value)
+
+    # Plot text in upper righthand corner. Ajust alignment, and
+    # Make the text box background opaque white.
     ax.text(x=0.95, y=0.92,
             s=text + "=" + value_str,
             horizontalalignment='right', verticalalignment='center',
@@ -242,10 +261,15 @@ def draw_box(ax, text, float_value):
 
 
 def set_ticks(ax):
+    """Set graph x and y limits, add in grid lines, set the major axis
+    tick values to be integers, and multiples of five."""
 
+
+    # Set limits as defined at top of file
     ax.set_xlim([-graph_lim, graph_lim])
     ax.set_ylim([-graph_lim, graph_lim])
 
+    # Add in gridlines
     ax.grid()
 
     # Make x and y axis major ticks multiples of 5
@@ -261,6 +285,9 @@ def set_ticks(ax):
 
 
 def calc_disp_history(atom_history):
+    """Calculate the equivalent displacment of an atom from the origin
+    based on its previous path."""
+
     disp_history = []
     for xy in atom_history:
         disp_history.append(displacement(xy))
@@ -269,6 +296,8 @@ def calc_disp_history(atom_history):
 
 
 def displacement(xy):
+    """Calculate the displacement based on x,y coordinate of the form
+    [x, y]"""
     x = xy[0]
     y = xy[1]
 
@@ -276,35 +305,47 @@ def displacement(xy):
 
 
 def set_alpha(x):
+    """Function to increase transparency based on increasing input"""
     n = 5
     return n / (n+x)
 
 
-def set_colorbar(ax, color_mesh):
+def set_colorbar(ax, mesh):
+    """Set the colorbar to be the same height as graph for 2D meshgrid"""
+
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
+
+    # Set tick format to be a percentage
     tick_func = lambda x,pos: "{:.0%}".format(x)
     tick_format = FuncFormatter(tick_func)
-    plt.colorbar(color_mesh, cax=cax, format=tick_format)
 
-def set_color_lim(m_steps):
-    return 3 / (2 * pi * m_steps)
-
-def draw_atoms_histogram(ax_atoms, x_hist, y_hist):
-    _, _, _, color_mesh = ax_atoms.hist2d(x_hist, y_hist, bins=2*graph_lim+1, range=[[-graph_lim-0.5, graph_lim+0.5], [-graph_lim-0.5, graph_lim+0.5]], density=True, cmap=plt.get_cmap('Blues'))
-
-    divider = make_axes_locatable(ax_atoms)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    tick_func = lambda x,pos: "{:.0%}".format(x)
-    tick_format = FuncFormatter(tick_func)
-    plt.colorbar(color_mesh, cax=cax, format=tick_format)
+    plt.colorbar(mesh, cax=cax, format=tick_format)
 
 
-def draw_theoretical_histogram(ax_gauss, mean, std_dev, num_jumps, m_steps):
+def draw_atoms_histogram(ax_atoms, x_finals, y_finals):
+    """Draw the count of atoms in a given position."""
+
+    # Create 2D grid from historgram of
+    _, _, _, color_mesh = ax_atoms.hist2d(
+                            x_finals,
+                            y_finals,
+                            bins=2*graph_lim+1,
+                            range=[[-graph_lim-0.5, graph_lim+0.5],
+                                   [-graph_lim-0.5, graph_lim+0.5]],
+                            density=True,
+                            cmap=plt.get_cmap('Blues'))
+
+    set_colorbar(ax_atoms, color_mesh)
+
+
+def draw_theoretical_histogram(ax_gauss, mean, std_dev, m_steps):
+    """Draw the true distribution of the probability of finding an atom
+    at a given coordinate after m steps."""
 
     # Approximate continuous distribution with many grid points
     x_cont, y_cont = np.mgrid[-graph_lim:graph_lim:(2*graph_lim)*1j,
-                                -graph_lim:graph_lim:(2*graph_lim)*1j]
+                              -graph_lim:graph_lim:(2*graph_lim)*1j]
 
     # Calculate gaussian mesh
     distance = np.sqrt(x_cont*x_cont+y_cont*y_cont)
@@ -312,13 +353,6 @@ def draw_theoretical_histogram(ax_gauss, mean, std_dev, num_jumps, m_steps):
     z_cont *= 3 / (2 * pi * m_steps)
 
     gauss_mesh = ax_gauss.pcolormesh(x_cont, y_cont, z_cont,
-                                        cmap=plt.get_cmap('Blues'))
+                                     cmap=plt.get_cmap('Blues'))
 
-    # vmin=0,
-    # vmax=set_color_lim(num_jumps)
-
-    divider = make_axes_locatable(ax_gauss)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    tick_func = lambda x,pos: "{:.0%}".format(x)
-    tick_format = FuncFormatter(tick_func)
-    plt.colorbar(gauss_mesh, cax=cax, format=tick_format)
+    set_colorbar(ax_gauss, gauss_mesh)
