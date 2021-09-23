@@ -20,7 +20,7 @@ graph_lim = 10
 figsize = (14, 7)
 
 
-def display_atom(atom_history, show_displacement=False):
+def display_atom(atom_prev_states, show_displacement=False):
     """Shows the position of an atom in a square lattice.
 
     Optionally show the atom position 'crumb trail' as well as
@@ -41,14 +41,14 @@ def display_atom(atom_history, show_displacement=False):
 
     # Check whether atom is a single coordinate or a list including
     # previous positions
-    if isinstance(atom_history[0], int):
+    if isinstance(atom_prev_states[0], int):
         # Place atom on the square lattice
-        x_final, y_final = atom_history
+        x_final, y_final = atom_prev_states
         ax_atom.scatter(x=x_final, y=y_final, c='blue', zorder=4)
     else:
         # Draw atom previous position, incuding final atom position
-        x_final, y_final = atom_history[-1]
-        draw_atom_history(ax_atom, atom_history)
+        x_final, y_final = atom_prev_states[-1]
+        draw_atom_prev_states(ax_atom, atom_prev_states)
 
     # Add in arrow to highlight atom position
     ax_atom.arrow(x=0, y=0, dx=x_final, dy=y_final, width=0.2,
@@ -69,7 +69,7 @@ def display_atom(atom_history, show_displacement=False):
         ax_disp = fig.add_subplot('122')
 
         # Draw and format
-        draw_disp_history(ax_disp, atom_history)
+        draw_disp_history(ax_disp, atom_prev_states)
         ax_disp.set_ylabel("Displacement")
         ax_disp.set_xlabel("Number of Simulaton Steps", labelpad=20)
 
@@ -80,7 +80,7 @@ def display_atom(atom_history, show_displacement=False):
     plt.show()
 
 
-def display_atoms(atom_histories):
+def display_atoms(atoms_prev_states):
     """Shows the position of various atoms in a square lattice.
 
     Overlays the resulting simulation of various atoms and their
@@ -89,25 +89,25 @@ def display_atoms(atom_histories):
 
     Parameters
     ----------
-    atom_histories : list
+    atoms_prev_states : list
         The position history of various atoms as stored list of lists.
     """
 
-    n_atoms = len(atom_histories)
-    m_steps = len(atom_histories[0])
+    n_atoms = len(atoms_prev_states)
+    m_steps = len(atoms_prev_states[0])
     mean_disp_history = [0]*m_steps
 
     fig, (ax_atoms, ax_disps) = plt.subplots(1, 2, figsize=figsize)
 
     # Iterate through all atoms simulations
-    for atom_history in atom_histories:
+    for atom_prev_states in atoms_prev_states:
         # Draw atom trajectory and displacement
-        draw_atom_history(ax_atoms, atom_history, n_atoms)
-        draw_disp_history(ax_disps, atom_history, n_atoms)
+        draw_atom_prev_states(ax_atoms, atom_prev_states, n_atoms)
+        draw_disp_history(ax_disps, atom_prev_states, n_atoms)
 
         # Calculate the average displacement for the simulation
         # Append to list for plotting
-        disp_history = calc_disp_history(atom_history)
+        disp_history = calc_disp_history(atom_prev_states)
         for i, disp in enumerate(disp_history):
             mean_disp_history[i] += disp/n_atoms
 
@@ -134,7 +134,7 @@ def display_atoms(atom_histories):
     plt.show()
 
 
-def display_probability(atom_histories, show_gaussian=False):
+def display_probability(atoms_prev_states, show_gaussian=False):
     """Shows the final position of simulated atoms normalized by the
     number of atoms.
 
@@ -143,7 +143,7 @@ def display_probability(atom_histories, show_gaussian=False):
 
     Parameters
     ----------
-    atom_histories : list
+    atoms_prev_states : list
         The position history of various atoms as stored list of lists.
 
     show_gaussian : bool
@@ -154,11 +154,11 @@ def display_probability(atom_histories, show_gaussian=False):
     ax_atoms = fig.add_subplot(121)
 
     # Since the there's 1 jump per timestep, steps equals jumps
-    num_jumps = len(atom_histories[0])
-    m_steps = len(atom_histories[0])
+    num_jumps = len(atoms_prev_states[0])
+    m_steps = len(atoms_prev_states[0])
 
     # Get final position of atoms and unpack as x,y values
-    atoms_final = [atom_history[-1] for atom_history in atom_histories]
+    atoms_final = [atom_prev_states[-1] for atom_prev_states in atoms_prev_states]
     x_finals, y_finals = zip(*atoms_final)
 
     # Create the estimated gaussian distribution
@@ -206,13 +206,13 @@ def draw_lattice_atoms(ax):
             ax.add_artist(lattice_circle)
 
 
-def draw_atom_history(ax, atom_history, n_atoms=1):
+def draw_atom_prev_states(ax, atom_prev_states, n_atoms=1):
     """Draw the atom's previous path from starting point to endpoint.
     If there are several atoms to be drawn, transparency is added."""
 
     # Get final atom endpoint and previous path as xy coordinates
-    x_final, y_final = atom_history[-1]
-    x_hist, y_hist = zip(*atom_history)
+    x_final, y_final = atom_prev_states[-1]
+    x_hist, y_hist = zip(*atom_prev_states)
 
     # If several atoms to draw, add transparency
     if n_atoms != 1:
@@ -227,12 +227,12 @@ def draw_atom_history(ax, atom_history, n_atoms=1):
     ax.scatter(x=x_final, y=y_final, alpha=alpha_final, c='blue')
 
 
-def draw_disp_history(ax, atom_history, n_atoms=1):
+def draw_disp_history(ax, atom_prev_states, n_atoms=1):
     """Draw the displacement of an atom path against the number of time
     steps/jumps."""
 
     # Calculate displacements based of previous positions
-    disp_history = calc_disp_history(atom_history)
+    disp_history = calc_disp_history(atom_prev_states)
 
     if n_atoms != 1:
         alpha = set_alpha(n_atoms)
@@ -289,12 +289,12 @@ def set_ticks(ax):
     ax.minorticks_off()
 
 
-def calc_disp_history(atom_history):
+def calc_disp_history(atom_prev_states):
     """Calculate the equivalent displacment of an atom from the origin
     based on its previous path."""
 
     disp_history = []
-    for xy in atom_history:
+    for xy in atom_prev_states:
         disp_history.append(displacement(xy))
 
     return disp_history
@@ -349,8 +349,8 @@ def draw_theoretical_histogram(ax_gauss, mean, std_dev, m_steps):
     at a given coordinate after m steps."""
 
     # Approximate continuous distribution with many grid points
-    x_cont, y_cont = np.mgrid[-graph_lim:graph_lim:(2*graph_lim)*1j,
-                              -graph_lim:graph_lim:(2*graph_lim)*1j]
+    x_cont, y_cont = np.mgrid[-graph_lim-0.5:graph_lim+0.5:(2*graph_lim+2)*1j,
+                              -graph_lim-0.5:graph_lim+0.5:(2*graph_lim+2)*1j]
 
     # Calculate gaussian mesh
     distance = np.sqrt(x_cont*x_cont+y_cont*y_cont)
