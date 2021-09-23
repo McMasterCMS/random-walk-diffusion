@@ -58,6 +58,8 @@ def display_atom(atom_history, show_displacement=False):
     disp = displacement([x_final, y_final])
     draw_box(ax_atom, "Displacement", disp)
 
+    ax_atom.set_xlabel("Simulated Atom Position and Trajectory", labelpad=20)
+
     set_ticks(ax_atom)
     set_equal_aspect(ax_atom)
     draw_lattice_atoms(ax_atom)
@@ -69,7 +71,7 @@ def display_atom(atom_history, show_displacement=False):
         # Draw and format
         draw_disp_history(ax_disp, atom_history)
         ax_disp.set_ylabel("Displacement")
-        ax_disp.set_xlabel("Number of Simulaton Steps")
+        ax_disp.set_xlabel("Number of Simulaton Steps", labelpad=20)
 
         # Ensure that the axes look square
         set_equal_aspect(ax_disp)
@@ -109,10 +111,13 @@ def display_atoms(atom_histories):
         for i, disp in enumerate(disp_history):
             mean_disp_history[i] += disp/n_atoms
 
+    # Set axis label
+    ax_atoms.set_xlabel("Simulated Atom Positions and Trajectories", labelpad=20)
+    ax_disps.set_ylabel("Displacement")
+    ax_disps.set_xlabel("Number of Simulaton Steps", labelpad=20)
+
     # Plot average of all trajectory displacements
     ax_disps.plot(mean_disp_history, c='purple', linewidth=5)
-    ax_disps.set_ylabel("Displacement")
-    ax_disps.set_xlabel("Number of Simulaton Steps")
 
     # Include average final displacement of atoms
     draw_box(ax_atoms, "Mean Displacement", mean_disp_history[-1])
